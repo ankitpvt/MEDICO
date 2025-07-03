@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-
 function App() {
   const [symptoms, setSymptoms] = useState('');
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  const OPENROUTER_API_KEY = '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';
+  const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+//   const OPENROUTER_API_KEY = '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';
   const YOUR_SITE_URL = "https://your-symptom-checker.com";
   const YOUR_SITE_NAME = "My Symptom Checker";
 
