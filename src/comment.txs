@@ -1,0 +1,191 @@
+import React, { useState } from 'react';
+// Main App component for the Symptom Checker application.
+// This component allows users to enter symptoms and get potential diseases,
+// recommended medicines, precautions, and advice from the OpenRouter API
+// using the Deepseek Chat model.
+function App() {
+  // State to store the user-entered symptoms.
+  const [symptoms, setSymptoms] = useState('');
+  // State to manage the loading status during API calls.
+  const [loading, setLoading] = useState(false);
+  // State to store the response received from the OpenRouter API.
+  const [response, setResponse] = useState('');
+  // State to display any error messages to the user.
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // OpenRouter API Key provided by the user.
+  // IMPORTANT: In a real-world application, avoid hardcoding API keys directly in client-side code.
+  // Use environment variables or a backend proxy to keep your API key secure.
+  const OPENROUTER_API_KEY = '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';
+
+  // Optional: Your site URL and title for OpenRouter analytics.
+  // Replace with your actual site URL and name if deploying.
+  const YOUR_SITE_URL = "https://your-symptom-checker.com"; // Placeholder
+  const YOUR_SITE_NAME = "My Symptom Checker"; // Placeholder
+
+  /**
+   * Handles the form submission when the user clicks the "Check Symptoms" button.
+   * This function performs input validation, makes an asynchronous call to the
+   * OpenRouter API, and updates the UI based on the API response or any errors.
+   * @param {Event} e - The form submission event object.
+   */
+  const handleSubmit = async (e) => {
+    e.preventDefault(); // Prevent the default form submission behavior (page reload).
+
+    // Clear any previous error messages before a new submission.
+    setErrorMessage('');
+
+    // Input validation: Check if the symptoms input field is empty or just whitespace.
+    if (!symptoms.trim()) {
+      setErrorMessage('Please enter some symptoms to get a diagnosis.');
+      return; // Stop the function execution if no symptoms are entered.
+    }
+
+    // Set loading state to true to show a loading indicator to the user.
+    setLoading(true);
+    // Clear any previous AI response.
+    setResponse('');
+
+    try {
+      // Construct the payload (request body) for the OpenRouter API.
+      // The 'messages' array holds the conversation history. Here, it's a single user message.
+      const payload = {
+        model: "deepseek/deepseek-chat:free", // Specify the model to use from OpenRouter...
+        messages: [
+          {
+            role: "user", // The role of the message sender.
+            // The prompt for the AI, including the user's symptoms.
+            content: `I have the following symptoms: ${symptoms}. Please tell me the possible diseases, recommended medicines, precautions, and advice.`
+          }
+        ]
+      };
+
+      // Construct the full API URL for OpenRouter.
+      const apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+
+      // Make the API call using the native `fetch` API.
+      const result = await fetch(apiUrl, {
+        method: 'POST', // HTTP method is POST as we are sending data.
+        headers: {
+          'Content-Type': 'application/json', // Specify that the request body is JSON.
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`, // Authorization header with Bearer token.
+          'HTTP-Referer': YOUR_SITE_URL, // Optional: Site URL for OpenRouter analytics.
+          'X-Title': YOUR_SITE_NAME, // Optional: Site title for OpenRouter analytics.
+        },
+        body: JSON.stringify(payload), // Convert the JavaScript object payload to a JSON string.
+      });
+
+      // Check if the HTTP response status is NOT OK (i.e., 4xx or 5xx error).
+      if (!result.ok) {
+        // Attempt to parse the error response from the API.
+        const errorData = await result.json();
+        console.error('API Error Response:', errorData);
+
+        // Provide a more specific error message based on the status and OpenRouter's typical errors.
+        setErrorMessage(
+          `API request failed with status ${result.status}. ` +
+          `Error: ${errorData.message || errorData.error?.message || 'Unknown error.'} ` +
+          `Please check your OpenRouter API key and permissions.`
+        );
+        return; // Stop execution after handling the error.
+      }
+
+      // If the response is OK, parse the JSON data from the response.
+      const data = await result.json();
+
+      // Safely extract the generated text from the nested structure of the OpenRouter API response.
+      // Using optional chaining (?.) to prevent errors if any part of the path is undefined.
+      const aiResponseContent = data.choices?.[0]?.message?.content;
+
+      // Update the response state with the AI's answer or a default message if no valid response.
+      if (aiResponseContent) {
+        setResponse(aiResponseContent);
+      } else {
+        setResponse('No valid response received from the AI. Please try again.');
+      }
+
+    } catch (error) {
+      // Catch any network errors or errors thrown from the try block.
+      console.error('Error during API call:', error);
+      // Display a user-friendly error message.
+      setErrorMessage(`An unexpected error occurred: ${error.message || 'Please try again later.'}`);
+    } finally {
+      // This block always executes, regardless of success or failure.
+      // Set loading state back to false.
+      setLoading(false);
+    }
+  };
+
+  // The component's JSX structure, defining the UI.
+  return (
+    // Main container div with Tailwind CSS classes for full screen, centering, and background.
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 font-sans">
+      {/* Card-like container for the application content. */}
+      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl border border-gray-200">
+        {/* Application title. */}
+        <h1 className="text-4xl font-extrabold text-center text-gray-800 mb-8 tracking-tight">
+          Symptom Checker
+        </h1>
+
+        {/* Form for user input. */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            {/* Label for the symptoms input field. */}
+            <label htmlFor="symptoms" className="block text-lg font-medium text-gray-700 mb-2">
+              Enter Symptoms:
+            </label>
+            {/* Input field for symptoms. */}
+            <input
+              id="symptoms"
+              type="text"
+              value={symptoms}
+              onChange={(e) => setSymptoms(e.target.value)}
+              placeholder="e.g., headache, fever, sore throat, cough"
+              // Tailwind classes for styling, responsiveness, and disabled state.
+              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base transition duration-200 ease-in-out disabled:opacity-70 disabled:bg-gray-50"
+              disabled={loading} // Disable input while API call is in progress.
+            />
+          </div>
+          
+          {/* Conditional rendering for custom error messages. */}
+          {errorMessage && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative" role="alert">
+              <strong className="font-bold">Error!</strong>
+              <span className="block sm:inline ml-2">{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Submit button. */}
+          <button
+            type="submit"
+            disabled={loading} // Disable button while API call is in progress.
+            // Tailwind classes for styling, hover effects, and disabled state.
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Checking...' : 'Check Symptoms'}
+          </button>
+        </form>
+
+        {/* Conditional rendering for loading indicator. */}
+        {loading && (
+          <p className="text-center text-blue-600 mt-8 text-lg font-medium animate-pulse">
+            Asking AI for a diagnosis...
+          </p>
+        )}
+
+        {/* Conditional rendering for displaying the AI response. */}
+        {response && (
+          <div className="mt-8 p-6 bg-blue-50 rounded-xl border border-blue-200 shadow-inner">
+            <h2 className="text-2xl font-semibold text-blue-800 mb-4">
+              <span role="img" aria-label="robot icon" className="mr-2">🤖</span>AI Response:
+            </h2>
+            {/* Display the response text. `whitespace-pre-wrap` preserves line breaks from the AI. */}
+            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{response}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default App;
